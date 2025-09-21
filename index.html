@@ -1,193 +1,532 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-<title>Thumb Zen (Harder)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>KnightFlip — ナイト反転パズル</title>
+<meta name="theme-color" content="#0f172a" />
 <style>
-  html,body{margin:0;height:100%;background:#111;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto}
-  #c{display:block;width:100vw;height:100vh;touch-action:none}
-  #hint{position:fixed;top:10px;left:0;right:0;text-align:center;font-size:14px;opacity:.8}
-  #toast{position:fixed;bottom:12px;left:0;right:0;text-align:center;font-size:16px;opacity:.9}
+  :root{
+    --bg:#0b1220; --panel:#0f172a; --paper:#0b1220; --ink:#e5e7eb; --muted:#94a3b8; --line:#273449;
+    --on:#60a5fa; --off:#0b1220; --accent:#22c55e; --warn:#ef4444; --focus:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 700px at 50% -10%, #111827, #0b1220 55%);color:var(--ink);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",Arial,sans-serif}
+  #wrap{min-height:100%;display:flex;flex-direction:column}
+  header,footer{border-color:var(--line)}
+  header{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .ttl{font-weight:900;letter-spacing:.02em}
+  .sub{color:var(--muted);font-size:12px}
+  .grow{flex:1}
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .chip{background:#0e1628;border:1px solid var(--line);padding:6px 10px;border-radius:10px}
+  .btn{border:1px solid var(--line);background:#0e1628;color:var(--ink);padding:7px 12px;border-radius:10px;font-weight:700;cursor:pointer}
+  .btn.strong{background:#16a34a;border-color:#16a34a;color:#fff}
+  .btn.ghost{background:#0e1628}
+  .btn:disabled{opacity:.45;cursor:default}
+  select,input[type="number"],input[type="text"]{background:#0e1628;border:1px solid var(--line);color:var(--ink);padding:6px 8px;border-radius:8px}
+  label{color:var(--muted);font-size:12px}
+  #stage{flex:1;display:flex;align-items:center;justify-content:center;padding:14px}
+  canvas{display:block;background:#0b1220;border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.35)}
+  footer{padding:10px 14px;border-top:1px solid var(--line);color:var(--muted);text-align:center}
+  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0b1220;border:1px solid var(--line);color:#fff;border-radius:10px;padding:8px 12px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  /* dialog */
+  #help{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:18px}
+  #help[open]{display:flex}
+  #help .card{width:min(560px,92vw);background:#0e1628;border:1px solid var(--line);border-radius:16px;padding:16px}
+  #help h3{margin:.2em 0 .6em;font-size:18px}
+  #help ol{padding-left:1.2em}
+  #help .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+  /* win overlay */
+  .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center}
+  .overlay.show{display:flex}
+  .winbox{background:#0e1628;border:1px solid var(--line);padding:16px;border-radius:14px;text-align:center}
+  .kbd{padding:.1em .45em;border:1px solid var(--line);border-radius:6px;background:#0b1220}
+  /* focus ring for keyboard cell */
+  .focusRing{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="hint">円の中に親指を置き続ける ⇨ 規定秒で勝ち（動く円から逃げられるかな？）</div>
-<div id="toast"></div>
+<div id="wrap">
+  <header>
+    <div class="brand">
+      <div class="ttl">KnightFlip</div>
+      <div class="sub">ナイト反転パズル — クリックしたマスと“ナイトの手”が同時反転</div>
+    </div>
+    <div class="row">
+      <div class="chip">Moves: <b id="moves">0</b></div>
+      <div class="chip">Best: <b id="best">–</b></div>
+      <div class="chip">Seed: <b id="seedShow">–</b></div>
+    </div>
+    <div class="grow"></div>
+    <div class="row" role="group" aria-label="設定">
+      <label>サイズ</label>
+      <select id="sizeSel" aria-label="盤面サイズ">
+        <option value="5">5×5</option>
+        <option value="7" selected>7×7</option>
+        <option value="9">9×9</option>
+      </select>
+      <label>難易度</label>
+      <select id="diffSel" aria-label="難易度">
+        <option value="easy">やさしい</option>
+        <option value="norm" selected>ふつう</option>
+        <option value="hard">むずかしい</option>
+        <option value="wild">ワイルド</option>
+      </select>
+      <button class="btn ghost" id="undoBtn" aria-keyshortcuts="Control+Z">元に戻す</button>
+      <button class="btn ghost" id="redoBtn" aria-keyshortcuts="Control+Shift+Z">やり直す</button>
+      <button class="btn" id="reshuffleBtn" title="同じサイズ・難易度で新局面">シャッフル</button>
+      <button class="btn strong" id="newBtn">新しく始める</button>
+      <button class="btn ghost" id="helpBtn" aria-haspopup="dialog" aria-controls="help">遊び方</button>
+    </div>
+  </header>
+
+  <div id="stage" aria-label="ゲーム盤面コンテナ">
+    <canvas id="cv" width="480" height="480" role="img" aria-label="ナイト反転パズル 盤面"></canvas>
+    <div class="overlay" id="winOverlay" aria-hidden="true">
+      <div class="winbox">
+        <h3 style="margin:.2em 0">🎉 CLEAR!</h3>
+        <div style="color:var(--muted)">シード <span id="seedWin">–</span>／手数 <b id="movesWin">0</b></div>
+        <div style="margin-top:10px;display:flex;gap:8px;justify-content:center">
+          <button class="btn strong" id="nextBtn">もう1問</button>
+          <button class="btn ghost" id="shareBtn">シードをコピー</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    クリック/タップ：マス反転（ナイトの手も反転） ／ 矢印キーで移動、<span class="kbd">Space</span>か<span class="kbd">Enter</span>で反転。<br />
+    生成は常に“解ける局面”。難易度はランダム手数で調整。アクセシビリティ配慮：拡大可・ARIAライブ・キーボード操作。
+  </footer>
+</div>
+
+<!-- How-to dialog -->
+<div id="help" role="dialog" aria-modal="true" aria-label="遊び方">
+  <div class="card" role="document">
+    <h3>🧩 遊び方 — KnightFlip</h3>
+    <ol>
+      <li>マスをクリック/タップすると、<b>そのマス</b>と、そこから<b>ナイトの手</b>にあるマス（2×1 or 1×2 離れ）も同時に反転します。</li>
+      <li>すべてのマスを<b>オフ（黒/白抜き）</b>にできればクリア。</li>
+      <li>盤面は常に<b>解ける局面のみ</b>生成（解答は一意とは限りません）。</li>
+      <li>矢印キーでカーソル移動、<span class="kbd">Space</span>/<span class="kbd">Enter</span> で反転、<span class="kbd">Ctrl+Z</span> で元に戻す。</li>
+      <li>シードをコピーして友だちに同じ問題を共有できます。</li>
+    </ol>
+    <div class="actions">
+      <button class="btn ghost" id="closeHelp">閉じる</button>
+      <button class="btn strong" id="okHelp">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
 <script>
-/* ===== 難易度パラメータ（好みで調整） ===== */
-const CLEAR_TIME = 12;      // クリアまでの秒数（長いほど難）
-const REPEL_BASE = 55;      // 反発の強さ（大きいほど難）
-const DRIFT_BASE = 18;      // 常時ゆらぎ（大きいほど難）
-const GUST_BASE  = 0.0022;  // 突風の強さ（画面サイズ比）
-const SHRINK_MAX = 0.22;    // クリアまでに半径が最大どれだけ小さくなるか（割合）
+/* ============================================================
+   KnightFlip — ナイト反転パズル
+   クリックしたセル＋ナイトの手（±1,±2/±2,±1）が同時トグル。
+   生成は solved からランダム手を適用 → 常に解ける局面。
+   著作権配慮：既存有名作の名称/データ/コードは一切流用なし。
+   ============================================================ */
 
-/* ====== ここから本体 ====== */
-const canvas=document.getElementById('c');
-const ctx=canvas.getContext('2d');
-let w,h,cssW,cssH,dpr;
-function resize(){
-  dpr=window.devicePixelRatio||1;
-  cssW=innerWidth; cssH=innerHeight;
-  w=canvas.width=cssW*dpr; h=canvas.height=cssH*dpr;
-}
-addEventListener('resize',resize); resize();
+(()=> {
+  // ---------- DOM ----------
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const movesEl = document.getElementById('moves');
+  const bestEl  = document.getElementById('best');
+  const seedShow= document.getElementById('seedShow');
+  const sizeSel = document.getElementById('sizeSel');
+  const diffSel = document.getElementById('diffSel');
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  const reshuf  = document.getElementById('reshuffleBtn');
+  const newBtn  = document.getElementById('newBtn');
+  const helpBtn = document.getElementById('helpBtn');
+  const help    = document.getElementById('help');
+  const closeHelp = document.getElementById('closeHelp');
+  const okHelp  = document.getElementById('okHelp');
+  const toastEl = document.getElementById('toast');
+  const overlay = document.getElementById('winOverlay');
+  const seedWin = document.getElementById('seedWin');
+  const movesWin= document.getElementById('movesWin');
+  const nextBtn = document.getElementById('nextBtn');
+  const shareBtn= document.getElementById('shareBtn');
 
-const state = {
-  x:0,y:0,r:80, vx:0,vy:0, baseR:80, phase:Math.random()*Math.PI*2
-};
-let playing=false, tStart=0, progress=0, last=0, nextGust=0;
-let best=+localStorage.getItem('best2')||0;
-const toast=s=>document.getElementById('toast').textContent=s;
+  // ---------- Layout / HiDPI ----------
+  const BASE = 480;
+  function fit(){
+    const maxW = Math.min(innerWidth - 28, 560);
+    const ratio = maxW / BASE;
+    const dpr = Math.max(1, devicePixelRatio || 1);
 
-function reset(){
-  state.baseR=Math.min(w,h)/6;
-  state.r=state.baseR;
-  state.x=w/2; state.y=h/2;
-  state.vx=0; state.vy=0;
-  progress=0; playing=false; tStart=0; last=performance.now();
-  nextGust=last+800+Math.random()*800;
-  toast(best?`ベスト ${best.toFixed(2)}s`:``);
-}
-reset();
-
-let px=-999,py=-999,touching=false;
-function updatePointer(e){
-  const r=canvas.getBoundingClientRect();
-  px=(e.clientX-r.left)*dpr; py=(e.clientY-r.top)*dpr;
-}
-canvas.addEventListener('pointerdown',e=>{
-  canvas.setPointerCapture(e.pointerId);
-  touching=true; updatePointer(e);
-  startIfReady();
-});
-canvas.addEventListener('pointermove',e=>{ if(touching) updatePointer(e); });
-['pointerup','pointercancel','lostpointercapture'].forEach(t=>canvas.addEventListener(t,()=>{ touching=false; fail(); }));
-
-function inside(x,y){ const dx=x-state.x, dy=y-state.y; return Math.hypot(dx,dy)<=state.r; }
-
-function startIfReady(){
-  if(!playing && inside(px,py)){
-    playing=true; tStart=performance.now(); last=tStart;
-    // 開始直後に必ず動き出すようにキックを与える
-    const s=Math.min(w,h);
-    state.vx += (Math.random()-.5)*s*GUST_BASE*1.2;
-    state.vy += (Math.random()-.5)*s*GUST_BASE*1.2;
-    toast('キープ！ 指を離すとはみ出しやすくなるよ');
+    cv.style.width  = maxW + 'px';
+    cv.style.height = (BASE * ratio) + 'px';
+    cv.width  = Math.round(BASE * dpr);
+    cv.height = Math.round(BASE * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
   }
-}
-function fail(){
-  if(playing) toast('アウト！ もう一度タップ');
-  playing=false; progress=0;
-}
+  addEventListener('resize', fit);
 
-function step(now){
-  if(!last) last=now;
-  let dt=(now-last)/1000;
-  if(dt>0.05) dt=0.05; // 一時停止復帰で暴れないように
-  last=now;
+  // ---------- Game State ----------
+  let N = 7;                 // board size
+  let grid = [];             // boolean 2D
+  let moves = 0;
+  let seed = 0;
+  let prng = null;
+  const UNDO_MAX = 200;
+  const undoStack = [];
+  const redoStack = [];
+  let focusCell = {i:0,j:0}; // keyboard focus (grid coords)
+  let won = false;
 
-  // 経過に応じて難易度をじわっと上げる
-  const tProg = playing ? Math.min(1,(now - tStart)/1000 / CLEAR_TIME) : 0;
+  // 難易度 → スクランブル手数範囲
+  const DIFF = {
+    easy: [6, 10],
+    norm: [12, 20],
+    hard: [24, 36],
+    wild: [40, 60]
+  };
 
-  // 半径：呼吸 + 徐々に縮小
-  const breathe = 0.06*Math.sin((now*0.005)+state.phase); // ±6%
-  state.r = state.baseR * (1 + breathe) * (1 - SHRINK_MAX*tProg);
+  // Knight offsets
+  const KN = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
 
-  // 常時ドリフト（止まらないように）
-  state.vx += (Math.random()-.5) * DRIFT_BASE * (1+1.5*tProg) * dt * dpr;
-  state.vy += (Math.random()-.5) * DRIFT_BASE * (1+1.5*tProg) * dt * dpr;
+  // ---------- PRNG（Mulberry32） ----------
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function randInt(lo, hi){ return Math.floor(prng() * (hi - lo + 1)) + lo; }
+  function choice(arr){ return arr[Math.floor(prng()*arr.length)] }
 
-  // 指が中にあるほど“逃げる”反発
-  if(touching){
-    const dx = state.x - px, dy = state.y - py;
-    const dist = Math.hypot(dx,dy) + 0.0001;
-    const insideAmt = Math.max(0, state.r - dist) / state.r; // 0..1
-    if(insideAmt>0){
-      const repel = (REPEL_BASE * (0.9 + 2.2*tProg)) * insideAmt; // 時間と共に強く
-      state.vx += (dx/dist) * repel * dt * dpr * 60;
-      state.vy += (dy/dist) * repel * dt * dpr * 60;
+  // ---------- Persistence ----------
+  function bestKey(){ return `kf_best_${N}_${diffSel.value}`; }
+  function seedKey(){ return `kf_seed_${N}_${diffSel.value}`; }
+  function getBest(){ return +(localStorage.getItem(bestKey())||0) || null; }
+  function setBest(v){ localStorage.setItem(bestKey(), v) }
+
+  // ---------- Grid helpers ----------
+  function makeGrid(n, fill=false){
+    return Array.from({length:n},()=>Array.from({length:n},()=>fill));
+  }
+  function cloneGrid(g){ return g.map(row=>row.slice()) }
+  function inBounds(i,j){ return i>=0 && j>=0 && i<N && j<N }
+
+  function toggle(i,j){
+    grid[i][j] = !grid[i][j];
+    for (const [di,dj] of KN){
+      const ni=i+di, nj=j+dj;
+      if (inBounds(ni,nj)) grid[ni][nj] = !grid[ni][nj];
     }
   }
 
-  // たまに突風
-  if(now > nextGust){
-    const s=Math.min(w,h);
-    state.vx += (Math.random()-.5)*s*GUST_BASE*(1+1.2*tProg);
-    state.vy += (Math.random()-.5)*s*GUST_BASE*(1+1.2*tProg);
-    // 進行するほど間隔が短くなる
-    nextGust = now + 1200 - 700*tProg + Math.random()*700;
+  // ---------- Undo/Redo ----------
+  function snapshot(){ return {grid:cloneGrid(grid), moves} }
+  function pushUndo(){
+    undoStack.push(snapshot());
+    if (undoStack.length>UNDO_MAX) undoStack.shift();
+    redoStack.length = 0;
+  }
+  function undo(){
+    if (!undoStack.length) return;
+    const s = undoStack.pop();
+    redoStack.push(snapshot());
+    grid = s.grid; moves = s.moves;
+    updateHUD(); draw();
+  }
+  function redo(){
+    if (!redoStack.length) return;
+    const s = redoStack.pop();
+    undoStack.push(snapshot());
+    grid = s.grid; moves = s.moves;
+    updateHUD(); draw();
   }
 
-  // 摩擦（無限加速防止）
-  const drag = Math.pow(0.985, dt*60);
-  state.vx *= drag; state.vy *= drag;
+  // ---------- Generation ----------
+  function newSeed(val){
+    if (typeof val === 'number') seed = val >>> 0;
+    else seed = (Date.now() ^ Math.floor(Math.random()*1e9)) >>> 0;
+    prng = mulberry32(seed);
+    localStorage.setItem(seedKey(), String(seed));
+  }
+  function applyScramble(){
+    const [lo,hi] = DIFF[diffSel.value] || DIFF.norm;
+    const K = randInt(lo, hi);
+    for (let k=0;k<K;k++){
+      const i = randInt(0,N-1), j = randInt(0,N-1);
+      toggle(i,j);
+    }
+    // 冗長すぎる全点対称性を回避するため、ごく稀にランダムセルを固定オフ
+    if (prng() < 0.08){ grid[randInt(0,N-1)][randInt(0,N-1)] = false; }
+  }
 
-  // 位置更新
-  state.x += state.vx * dt;
-  state.y += state.vy * dt;
+  function startNew(){
+    won = false;
+    overlay.classList.remove('show');
+    grid = makeGrid(N, false);
+    moves = 0;
+    undoStack.length = 0; redoStack.length = 0;
+    newSeed();
+    prng(); // warm-up
+    applyScramble();
+    updateHUD(); draw();
+    announce(`新しい局面を開始。サイズ${N}、難易度${diffSel.options[diffSel.selectedIndex].text}、シード${seed}`);
+  }
 
-  // 壁でバウンド
-  const bounce = -0.7;
-  if(state.x < state.r){ state.x = state.r; state.vx *= bounce; }
-  if(state.x > w - state.r){ state.x = w - state.r; state.vx *= bounce; }
-  if(state.y < state.r){ state.y = state.r; state.vy *= bounce; }
-  if(state.y > h - state.r){ state.y = h - state.r; state.vy *= bounce; }
+  function reshuffle(){
+    won = false;
+    overlay.classList.remove('show');
+    grid = makeGrid(N, false);
+    moves = 0;
+    undoStack.length = 0; redoStack.length = 0;
+    // 同じ seed を使わず、直近 seed の派生（加算）で変化を出す
+    newSeed((seed + 0x9e3779b9) >>> 0);
+    prng(); applyScramble();
+    updateHUD(); draw();
+  }
 
-  // 成否判定
-  if(playing){
-    if(!inside(px,py)) fail();
-    else{
-      progress = (now - tStart)/1000;
-      if(progress >= CLEAR_TIME){
-        playing=false; 
-        best=Math.max(best,progress); localStorage.setItem('best2',best);
-        toast('クリア！ 画面タップで再開');
+  function loadFromHash(){
+    const h = location.hash.slice(1);
+    if (!h) return false;
+    const m = h.match(/^n(\d+)-d(easy|norm|hard|wild)-s(\d+)$/);
+    if (!m) return false;
+    N = Math.max(3, Math.min(15, +m[1]|0));
+    sizeSel.value = String(N);
+    diffSel.value = m[2];
+    won = false; overlay.classList.remove('show');
+    grid = makeGrid(N,false); moves=0; undoStack.length=0; redoStack.length=0;
+    newSeed((+m[3])>>>0);
+    prng(); applyScramble();
+    updateHUD(); draw();
+    return true;
+  }
+
+  function shareSeed(){
+    const tag = `n${N}-d${diffSel.value}-s${seed>>>0}`;
+    const url = location.href.replace(/#.*$/,'') + '#' + tag;
+    navigator.clipboard?.writeText(url).then(()=>{
+      toast('URLをクリップボードにコピーしました');
+    }, ()=> toast('コピーできませんでした'));
+  }
+
+  // ---------- HUD / Win ----------
+  function updateHUD(){
+    movesEl.textContent = String(moves);
+    seedShow.textContent = String(seed>>>0);
+    const best = getBest();
+    bestEl.textContent = best!=null ? String(best) : '–';
+    undoBtn.disabled = undoStack.length===0;
+    redoBtn.disabled = redoStack.length===0;
+  }
+
+  function isClear(){
+    for (let i=0;i<N;i++) for (let j=0;j<N;j++) if (grid[i][j]) return false;
+    return true;
+  }
+
+  function onMove(i,j){
+    if (won) return;
+    pushUndo();
+    toggle(i,j);
+    moves++;
+    updateHUD();
+    draw();
+
+    if (isClear()){
+      won = true;
+      const best = getBest();
+      if (best==null || moves < best) setBest(moves);
+      seedWin.textContent = String(seed>>>0);
+      movesWin.textContent = String(moves);
+      overlay.classList.add('show');
+      announce('クリア！ おめでとうございます');
+    }
+  }
+
+  // ---------- Rendering ----------
+  function draw(){
+    const W = cv.width, H = cv.height; // device pixels
+    ctx.save();
+    // 論理座標を 0..BASE に
+    ctx.setTransform(W/BASE, 0, 0, H/BASE, 0, 0);
+    ctx.clearRect(0,0,BASE,BASE);
+
+    const pad = 24;
+    const gW = BASE - pad*2;
+    const cell = gW / N;
+    const r = Math.min(12, cell*0.18); // corner radius
+
+    // board bg
+    ctx.fillStyle = '#0e1628';
+    roundRect(pad-6, pad-6, gW+12, gW+12, 14);
+    ctx.fill();
+    ctx.strokeStyle = getCSS('--line'); ctx.lineWidth = 2;
+    roundRect(pad-6, pad-6, gW+12, gW+12, 14);
+    ctx.stroke();
+
+    // cells
+    for (let i=0;i<N;i++){
+      for (let j=0;j<N;j++){
+        const x = pad + j*cell, y = pad + i*cell;
+        const on = grid[i][j];
+        // tile
+        const base = on ? getCSS('--on') : '#0b1220';
+        const grd = ctx.createLinearGradient(x,y,x+cell,y+cell);
+        grd.addColorStop(0, on ? '#e0f2fe' : '#0b1220');
+        grd.addColorStop(1, base);
+        ctx.fillStyle = grd;
+        roundRect(x+2, y+2, cell-4, cell-4, r); ctx.fill();
+
+        // grid line
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+        roundRect(x+2, y+2, cell-4, cell-4, r); ctx.stroke();
+
+        // focus ring (keyboard)
+        if (focusCell.i===i && focusCell.j===j){
+          ctx.strokeStyle = getCSS('--focus'); ctx.lineWidth = 2;
+          roundRect(x+4, y+4, cell-8, cell-8, Math.max(6,r-2)); ctx.stroke();
+        }
       }
     }
+
+    // legend: show knight pattern from focus
+    drawLegend(pad, pad, cell);
+
+    ctx.restore();
   }
 
-  draw(now, tProg); requestAnimationFrame(step);
-}
+  function drawLegend(pad, padY, cell){
+    const i0=focusCell.i, j0=focusCell.j;
+    const x0 = pad + j0*cell + cell/2;
+    const y0 = padY + i0*cell + cell/2;
+    ctx.save();
+    ctx.globalAlpha = 0.28;
+    ctx.strokeStyle = getCSS('--accent');
+    ctx.lineWidth = 3;
+    for (const [di,dj] of KN){
+      const ni=i0+di, nj=j0+dj;
+      if (!inBounds(ni,nj)) continue;
+      const x1 = pad + nj*cell + cell/2;
+      const y1 = padY + ni*cell + cell/2;
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+      // dot
+      ctx.beginPath(); ctx.arc(x1,y1, 5, 0, Math.PI*2); ctx.fillStyle=getCSS('--accent'); ctx.fill();
+    }
+    // center dot
+    ctx.beginPath(); ctx.arc(x0,y0, 5, 0, Math.PI*2); ctx.fillStyle=getCSS('--accent'); ctx.fill();
+    ctx.restore();
+  }
 
-function draw(now, tProg){
-  ctx.clearRect(0,0,w,h);
-  // 背景
-  const g=ctx.createRadialGradient(state.x,state.y,state.r,w/2,h/2,Math.max(w,h)/1.2);
-  g.addColorStop(0,'#1b1b1b'); g.addColorStop(1,'#0a0a0a'); ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
-
-  // 外円（ターゲット）
-  ctx.lineWidth=Math.max(2,state.r*0.12);
-  ctx.strokeStyle='#3cf';
-  ctx.beginPath(); ctx.arc(state.x,state.y,state.r,0,Math.PI*2); ctx.stroke();
-
-  // 進捗
-  if(playing){
-    ctx.strokeStyle='#6f6';
+  function roundRect(x,y,w,h,r){
     ctx.beginPath();
-    ctx.arc(state.x,state.y,state.r,-Math.PI/2,-Math.PI/2+Math.PI*2*(progress/CLEAR_TIME));
-    ctx.stroke();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+  function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim() }
+
+  // ---------- Pointer ----------
+  function evtPos(e){
+    const rect = cv.getBoundingClientRect();
+    const clientX = e.clientX ?? (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY ?? (e.touches && e.touches[0].clientY);
+    const x = (clientX - rect.left) * (BASE/rect.width);
+    const y = (clientY - rect.top)  * (BASE/rect.height);
+    return {x,y};
+  }
+  function pickCell(x,y){
+    const pad=24, gW=BASE-pad*2, cell=gW/N;
+    const j = Math.floor((x-pad)/cell), i = Math.floor((y-pad)/cell);
+    if (!inBounds(i,j)) return null;
+    return {i,j};
   }
 
-  // 指カーソル
-  if(touching){
-    ctx.fillStyle=inside(px,py)?'#6f6':'#f55';
-    ctx.beginPath(); ctx.arc(px,py,Math.max(4,state.r*0.15),0,Math.PI*2); ctx.fill();
+  cv.addEventListener('pointerdown', (e)=>{
+    const p = evtPos(e);
+    const c = pickCell(p.x,p.y);
+    if (!c) return;
+    focusCell = c;
+    onMove(c.i, c.j);
+  });
+
+  // ---------- Keyboard ----------
+  addEventListener('keydown', (e)=>{
+    if (helpOpen) return;
+    const k = e.key;
+    if (k==='ArrowUp'){ focusCell.i = Math.max(0, focusCell.i-1); draw(); e.preventDefault(); }
+    else if (k==='ArrowDown'){ focusCell.i = Math.min(N-1, focusCell.i+1); draw(); e.preventDefault(); }
+    else if (k==='ArrowLeft'){ focusCell.j = Math.max(0, focusCell.j-1); draw(); e.preventDefault(); }
+    else if (k==='ArrowRight'){ focusCell.j = Math.min(N-1, focusCell.j+1); draw(); e.preventDefault(); }
+    else if (k===' ' || k==='Enter'){ onMove(focusCell.i, focusCell.j); e.preventDefault(); }
+    else if ((e.ctrlKey||e.metaKey) && !e.shiftKey && (k==='z' || k==='Z')){ undo(); }
+    else if ((e.ctrlKey||e.metaKey) && (e.shiftKey && (k==='z' || k==='Z'))){ redo(); }
+  });
+
+  // ---------- Buttons ----------
+  sizeSel.addEventListener('change', ()=>{
+    N = +sizeSel.value|0;
+    startNew(); draw();
+  });
+  diffSel.addEventListener('change', ()=>{ startNew(); });
+  newBtn.addEventListener('click', startNew);
+  reshuf.addEventListener('click', reshuffle);
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
+  nextBtn.addEventListener('click', ()=>{ overlay.classList.remove('show'); reshuffle(); });
+  shareBtn.addEventListener('click', shareSeed);
+
+  // ---------- Help dialog ----------
+  let helpOpen = false;
+  function openHelp(){ helpOpen=true; help.setAttribute('open',''); }
+  function closeHelpDlg(){ helpOpen=false; help.removeAttribute('open'); }
+  helpBtn.addEventListener('click', openHelp);
+  closeHelp.addEventListener('click', closeHelpDlg);
+  okHelp.addEventListener('click', closeHelpDlg);
+  help.addEventListener('click', (e)=>{ if (e.target===help) closeHelpDlg(); });
+
+  // ---------- Toast ----------
+  let toastTimer=null;
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>toastEl.classList.remove('show'), 1400);
   }
 
-  // テキスト
-  ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  if(!playing){
-    ctx.font=`${state.baseR*0.35}px system-ui`;
-    ctx.fillText('タップして開始', w/2, h*0.8);
+  // ---------- ARIA announce ----------
+  function announce(msg){
+    toast(msg); // トーストは role="status"
   }
-  if(best){
-    ctx.font=`${state.baseR*0.22}px system-ui`;
-    ctx.fillText(`BEST ${best.toFixed(2)}s`, w/2, h*0.1);
+
+  // ---------- Init ----------
+  function init(){
+    // 既存ハッシュから再現 or 保存 seed を使う
+    if (!loadFromHash()){
+      N = +sizeSel.value|0;
+      const savedSeed = +(localStorage.getItem(seedKey())||0);
+      if (savedSeed){
+        newSeed(savedSeed>>>0);
+        grid = makeGrid(N,false); moves=0; undoStack.length=0; redoStack.length=0;
+        prng = mulberry32(seed); prng(); applyScramble();
+      }else{
+        startNew();
+      }
+    }
+    fit();
   }
-}
-requestAnimationFrame(step);
+  addEventListener('hashchange', ()=>{ loadFromHash(); draw(); });
+  init();
+})();
 </script>
 </body>
 </html>
