@@ -3,97 +3,189 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-<title>Thumb Zen</title>
+<title>Thumb Zen (Harder)</title>
 <style>
   html,body{margin:0;height:100%;background:#111;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto}
   #c{display:block;width:100vw;height:100vh;touch-action:none}
-  #hint{position:fixed;top:12px;left:0;right:0;text-align:center;font-size:14px;opacity:.8}
+  #hint{position:fixed;top:10px;left:0;right:0;text-align:center;font-size:14px;opacity:.8}
   #toast{position:fixed;bottom:12px;left:0;right:0;text-align:center;font-size:16px;opacity:.9}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="hint">円の中に親指を置き続ける ⇨ 10秒で勝ち</div>
+<div id="hint">円の中に親指を置き続ける ⇨ 規定秒で勝ち（動く円から逃げられるかな？）</div>
 <div id="toast"></div>
 <script>
+/* ===== 難易度パラメータ（好みで調整） ===== */
+const CLEAR_TIME = 12;      // クリアまでの秒数（長いほど難）
+const REPEL_BASE = 55;      // 反発の強さ（大きいほど難）
+const DRIFT_BASE = 18;      // 常時ゆらぎ（大きいほど難）
+const GUST_BASE  = 0.0022;  // 突風の強さ（画面サイズ比）
+const SHRINK_MAX = 0.22;    // クリアまでに半径が最大どれだけ小さくなるか（割合）
+
+/* ====== ここから本体 ====== */
 const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
-let w,h; function resize(){w=canvas.width=innerWidth*devicePixelRatio;h=canvas.height=innerHeight*devicePixelRatio;}
+let w,h,cssW,cssH,dpr;
+function resize(){
+  dpr=window.devicePixelRatio||1;
+  cssW=innerWidth; cssH=innerHeight;
+  w=canvas.width=cssW*dpr; h=canvas.height=cssH*dpr;
+}
 addEventListener('resize',resize); resize();
 
-let ring={x:0,y:0,r:70,vx:0,vy:0};
-let playing=false,tStart=0,progress=0,best=+localStorage.getItem('best')||0;
+const state = {
+  x:0,y:0,r:80, vx:0,vy:0, baseR:80, phase:Math.random()*Math.PI*2
+};
+let playing=false, tStart=0, progress=0, last=0, nextGust=0;
+let best=+localStorage.getItem('best2')||0;
 const toast=s=>document.getElementById('toast').textContent=s;
 
 function reset(){
-  ring.r=Math.min(w,h)/6; ring.x=w/2; ring.y=h/2; ring.vx=0; ring.vy=0;
-  progress=0; playing=false; tStart=0; toast(best?`ベスト ${best.toFixed(2)}s`:``);
+  state.baseR=Math.min(w,h)/6;
+  state.r=state.baseR;
+  state.x=w/2; state.y=h/2;
+  state.vx=0; state.vy=0;
+  progress=0; playing=false; tStart=0; last=performance.now();
+  nextGust=last+800+Math.random()*800;
+  toast(best?`ベスト ${best.toFixed(2)}s`:``);
 }
 reset();
 
 let px=-999,py=-999,touching=false;
-
 function updatePointer(e){
   const r=canvas.getBoundingClientRect();
-  px=(e.clientX-r.left)*devicePixelRatio; py=(e.clientY-r.top)*devicePixelRatio;
+  px=(e.clientX-r.left)*dpr; py=(e.clientY-r.top)*dpr;
 }
-canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);touching=true;updatePointer(e);startIfReady();});
-canvas.addEventListener('pointermove',e=>{if(touching)updatePointer(e);});
-['pointerup','pointercancel','lostpointercapture'].forEach(t=>canvas.addEventListener(t,()=>{touching=false;fail();}));
+canvas.addEventListener('pointerdown',e=>{
+  canvas.setPointerCapture(e.pointerId);
+  touching=true; updatePointer(e);
+  startIfReady();
+});
+canvas.addEventListener('pointermove',e=>{ if(touching) updatePointer(e); });
+['pointerup','pointercancel','lostpointercapture'].forEach(t=>canvas.addEventListener(t,()=>{ touching=false; fail(); }));
 
-function inside(x,y){const dx=x-ring.x,dy=y-ring.y;return Math.hypot(dx,dy)<=ring.r;}
-function startIfReady(){ if(!playing && inside(px,py)){ playing=true; tStart=performance.now(); toast('10秒キープ！'); } }
-function fail(){ if(playing) toast('アウト！ もう一度タップ'); playing=false; progress=0; }
+function inside(x,y){ const dx=x-state.x, dy=y-state.y; return Math.hypot(dx,dy)<=state.r; }
 
-function step(t){
-  const speed=Math.min(w,h)/600;
-  if(!playing){ ring.vx+=(Math.random()-.5)*0.05; ring.vy+=(Math.random()-.5)*0.05; }
-  else{ const dx=ring.x-px,dy=ring.y-py; ring.vx+=(Math.random()-.5)*0.05+dx*0.00005; ring.vy+=(Math.random()-.5)*0.05+dy*0.00005; }
+function startIfReady(){
+  if(!playing && inside(px,py)){
+    playing=true; tStart=performance.now(); last=tStart;
+    // 開始直後に必ず動き出すようにキックを与える
+    const s=Math.min(w,h);
+    state.vx += (Math.random()-.5)*s*GUST_BASE*1.2;
+    state.vy += (Math.random()-.5)*s*GUST_BASE*1.2;
+    toast('キープ！ 指を離すとはみ出しやすくなるよ');
+  }
+}
+function fail(){
+  if(playing) toast('アウト！ もう一度タップ');
+  playing=false; progress=0;
+}
 
-  ring.x+=ring.vx*speed*16; ring.y+=ring.vy*speed*16;
-  ring.x=Math.max(ring.r,Math.min(w-ring.r,ring.x));
-  ring.y=Math.max(ring.r,Math.min(h-ring.r,ring.y));
+function step(now){
+  if(!last) last=now;
+  let dt=(now-last)/1000;
+  if(dt>0.05) dt=0.05; // 一時停止復帰で暴れないように
+  last=now;
 
+  // 経過に応じて難易度をじわっと上げる
+  const tProg = playing ? Math.min(1,(now - tStart)/1000 / CLEAR_TIME) : 0;
+
+  // 半径：呼吸 + 徐々に縮小
+  const breathe = 0.06*Math.sin((now*0.005)+state.phase); // ±6%
+  state.r = state.baseR * (1 + breathe) * (1 - SHRINK_MAX*tProg);
+
+  // 常時ドリフト（止まらないように）
+  state.vx += (Math.random()-.5) * DRIFT_BASE * (1+1.5*tProg) * dt * dpr;
+  state.vy += (Math.random()-.5) * DRIFT_BASE * (1+1.5*tProg) * dt * dpr;
+
+  // 指が中にあるほど“逃げる”反発
+  if(touching){
+    const dx = state.x - px, dy = state.y - py;
+    const dist = Math.hypot(dx,dy) + 0.0001;
+    const insideAmt = Math.max(0, state.r - dist) / state.r; // 0..1
+    if(insideAmt>0){
+      const repel = (REPEL_BASE * (0.9 + 2.2*tProg)) * insideAmt; // 時間と共に強く
+      state.vx += (dx/dist) * repel * dt * dpr * 60;
+      state.vy += (dy/dist) * repel * dt * dpr * 60;
+    }
+  }
+
+  // たまに突風
+  if(now > nextGust){
+    const s=Math.min(w,h);
+    state.vx += (Math.random()-.5)*s*GUST_BASE*(1+1.2*tProg);
+    state.vy += (Math.random()-.5)*s*GUST_BASE*(1+1.2*tProg);
+    // 進行するほど間隔が短くなる
+    nextGust = now + 1200 - 700*tProg + Math.random()*700;
+  }
+
+  // 摩擦（無限加速防止）
+  const drag = Math.pow(0.985, dt*60);
+  state.vx *= drag; state.vy *= drag;
+
+  // 位置更新
+  state.x += state.vx * dt;
+  state.y += state.vy * dt;
+
+  // 壁でバウンド
+  const bounce = -0.7;
+  if(state.x < state.r){ state.x = state.r; state.vx *= bounce; }
+  if(state.x > w - state.r){ state.x = w - state.r; state.vx *= bounce; }
+  if(state.y < state.r){ state.y = state.r; state.vy *= bounce; }
+  if(state.y > h - state.r){ state.y = h - state.r; state.vy *= bounce; }
+
+  // 成否判定
   if(playing){
     if(!inside(px,py)) fail();
     else{
-      progress=(t-tStart)/1000;
-      if(progress>=10){
-        playing=false; best=Math.max(best,progress); localStorage.setItem('best',best);
+      progress = (now - tStart)/1000;
+      if(progress >= CLEAR_TIME){
+        playing=false; 
+        best=Math.max(best,progress); localStorage.setItem('best2',best);
         toast('クリア！ 画面タップで再開');
       }
     }
   }
 
-  draw(); requestAnimationFrame(step);
+  draw(now, tProg); requestAnimationFrame(step);
 }
 
-function draw(){
+function draw(now, tProg){
   ctx.clearRect(0,0,w,h);
-  const g=ctx.createRadialGradient(ring.x,ring.y,ring.r,w/2,h/2,Math.max(w,h)/1.2);
-  g.addColorStop(0,'#1e1e1e'); g.addColorStop(1,'#0a0a0a'); ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+  // 背景
+  const g=ctx.createRadialGradient(state.x,state.y,state.r,w/2,h/2,Math.max(w,h)/1.2);
+  g.addColorStop(0,'#1b1b1b'); g.addColorStop(1,'#0a0a0a'); ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
 
-  ctx.lineWidth=ring.r*0.12;
+  // 外円（ターゲット）
+  ctx.lineWidth=Math.max(2,state.r*0.12);
   ctx.strokeStyle='#3cf';
-  ctx.beginPath(); ctx.arc(ring.x,ring.y,ring.r,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(state.x,state.y,state.r,0,Math.PI*2); ctx.stroke();
 
+  // 進捗
   if(playing){
     ctx.strokeStyle='#6f6';
     ctx.beginPath();
-    ctx.arc(ring.x,ring.y,ring.r,-Math.PI/2,-Math.PI/2+Math.PI*2*(progress/10));
+    ctx.arc(state.x,state.y,state.r,-Math.PI/2,-Math.PI/2+Math.PI*2*(progress/CLEAR_TIME));
     ctx.stroke();
   }
 
+  // 指カーソル
   if(touching){
     ctx.fillStyle=inside(px,py)?'#6f6':'#f55';
-    ctx.beginPath(); ctx.arc(px,py,ring.r*0.15,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px,py,Math.max(4,state.r*0.15),0,Math.PI*2); ctx.fill();
   }
 
-  ctx.fillStyle='#fff';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.font=`${ring.r*0.35}px system-ui`;
-  if(!playing) ctx.fillText('タップして開始', w/2, h*0.8);
-  if(best){ ctx.font=`${ring.r*0.22}px system-ui`; ctx.fillText(`BEST ${best.toFixed(2)}s`, w/2, h*0.1); }
+  // テキスト
+  ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  if(!playing){
+    ctx.font=`${state.baseR*0.35}px system-ui`;
+    ctx.fillText('タップして開始', w/2, h*0.8);
+  }
+  if(best){
+    ctx.font=`${state.baseR*0.22}px system-ui`;
+    ctx.fillText(`BEST ${best.toFixed(2)}s`, w/2, h*0.1);
+  }
 }
 requestAnimationFrame(step);
 </script>
