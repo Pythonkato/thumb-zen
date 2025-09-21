@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>Thumb Zen</title>
+<style>
+  html,body{margin:0;height:100%;background:#111;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto}
+  #c{display:block;width:100vw;height:100vh;touch-action:none}
+  #hint{position:fixed;top:12px;left:0;right:0;text-align:center;font-size:14px;opacity:.8}
+  #toast{position:fixed;bottom:12px;left:0;right:0;text-align:center;font-size:16px;opacity:.9}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">円の中に親指を置き続ける ⇨ 10秒で勝ち</div>
+<div id="toast"></div>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let w,h; function resize(){w=canvas.width=innerWidth*devicePixelRatio;h=canvas.height=innerHeight*devicePixelRatio;}
+addEventListener('resize',resize); resize();
+
+let ring={x:0,y:0,r:70,vx:0,vy:0};
+let playing=false,tStart=0,progress=0,best=+localStorage.getItem('best')||0;
+const toast=s=>document.getElementById('toast').textContent=s;
+
+function reset(){
+  ring.r=Math.min(w,h)/6; ring.x=w/2; ring.y=h/2; ring.vx=0; ring.vy=0;
+  progress=0; playing=false; tStart=0; toast(best?`ベスト ${best.toFixed(2)}s`:``);
+}
+reset();
+
+let px=-999,py=-999,touching=false;
+
+function updatePointer(e){
+  const r=canvas.getBoundingClientRect();
+  px=(e.clientX-r.left)*devicePixelRatio; py=(e.clientY-r.top)*devicePixelRatio;
+}
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);touching=true;updatePointer(e);startIfReady();});
+canvas.addEventListener('pointermove',e=>{if(touching)updatePointer(e);});
+['pointerup','pointercancel','lostpointercapture'].forEach(t=>canvas.addEventListener(t,()=>{touching=false;fail();}));
+
+function inside(x,y){const dx=x-ring.x,dy=y-ring.y;return Math.hypot(dx,dy)<=ring.r;}
+function startIfReady(){ if(!playing && inside(px,py)){ playing=true; tStart=performance.now(); toast('10秒キープ！'); } }
+function fail(){ if(playing) toast('アウト！ もう一度タップ'); playing=false; progress=0; }
+
+function step(t){
+  const speed=Math.min(w,h)/600;
+  if(!playing){ ring.vx+=(Math.random()-.5)*0.05; ring.vy+=(Math.random()-.5)*0.05; }
+  else{ const dx=ring.x-px,dy=ring.y-py; ring.vx+=(Math.random()-.5)*0.05+dx*0.00005; ring.vy+=(Math.random()-.5)*0.05+dy*0.00005; }
+
+  ring.x+=ring.vx*speed*16; ring.y+=ring.vy*speed*16;
+  ring.x=Math.max(ring.r,Math.min(w-ring.r,ring.x));
+  ring.y=Math.max(ring.r,Math.min(h-ring.r,ring.y));
+
+  if(playing){
+    if(!inside(px,py)) fail();
+    else{
+      progress=(t-tStart)/1000;
+      if(progress>=10){
+        playing=false; best=Math.max(best,progress); localStorage.setItem('best',best);
+        toast('クリア！ 画面タップで再開');
+      }
+    }
+  }
+
+  draw(); requestAnimationFrame(step);
+}
+
+function draw(){
+  ctx.clearRect(0,0,w,h);
+  const g=ctx.createRadialGradient(ring.x,ring.y,ring.r,w/2,h/2,Math.max(w,h)/1.2);
+  g.addColorStop(0,'#1e1e1e'); g.addColorStop(1,'#0a0a0a'); ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+
+  ctx.lineWidth=ring.r*0.12;
+  ctx.strokeStyle='#3cf';
+  ctx.beginPath(); ctx.arc(ring.x,ring.y,ring.r,0,Math.PI*2); ctx.stroke();
+
+  if(playing){
+    ctx.strokeStyle='#6f6';
+    ctx.beginPath();
+    ctx.arc(ring.x,ring.y,ring.r,-Math.PI/2,-Math.PI/2+Math.PI*2*(progress/10));
+    ctx.stroke();
+  }
+
+  if(touching){
+    ctx.fillStyle=inside(px,py)?'#6f6':'#f55';
+    ctx.beginPath(); ctx.arc(px,py,ring.r*0.15,0,Math.PI*2); ctx.fill();
+  }
+
+  ctx.fillStyle='#fff';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font=`${ring.r*0.35}px system-ui`;
+  if(!playing) ctx.fillText('タップして開始', w/2, h*0.8);
+  if(best){ ctx.font=`${ring.r*0.22}px system-ui`; ctx.fillText(`BEST ${best.toFixed(2)}s`, w/2, h*0.1); }
+}
+requestAnimationFrame(step);
+</script>
+</body>
+</html>
