@@ -1,531 +1,701 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>KnightFlip — ナイト反転パズル</title>
-<meta name="theme-color" content="#0f172a" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Happy Birthday! 🎉 バースデー・バルーンゲーム</title>
+<meta name="description" content="30秒でバルーンを割ってスコアを稼ごう！ケーキのろうそくを全部消してお祝いしよう 🎂" />
+<meta name="theme-color" content="#ff7bd8" />
 <style>
   :root{
-    --bg:#0b1220; --panel:#0f172a; --paper:#0b1220; --ink:#e5e7eb; --muted:#94a3b8; --line:#273449;
-    --on:#60a5fa; --off:#0b1220; --accent:#22c55e; --warn:#ef4444; --focus:#f59e0b;
+    --bg1:#1b0f2e;
+    --bg2:#2a1051;
+    --accent:#ff7bd8;
+    --accent2:#ffd166;
+    --good:#2dd4bf;
+    --bad:#ef4444;
+    --panel: rgba(255,255,255,.1);
+    --glass: rgba(255,255,255,.08);
+    --text:#fff;
   }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:radial-gradient(1200px 700px at 50% -10%, #111827, #0b1220 55%);color:var(--ink);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",Arial,sans-serif}
-  #wrap{min-height:100%;display:flex;flex-direction:column}
-  header,footer{border-color:var(--line)}
-  header{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .brand{display:flex;align-items:baseline;gap:10px}
-  .ttl{font-weight:900;letter-spacing:.02em}
-  .sub{color:var(--muted);font-size:12px}
-  .grow{flex:1}
-  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .chip{background:#0e1628;border:1px solid var(--line);padding:6px 10px;border-radius:10px}
-  .btn{border:1px solid var(--line);background:#0e1628;color:var(--ink);padding:7px 12px;border-radius:10px;font-weight:700;cursor:pointer}
-  .btn.strong{background:#16a34a;border-color:#16a34a;color:#fff}
-  .btn.ghost{background:#0e1628}
-  .btn:disabled{opacity:.45;cursor:default}
-  select,input[type="number"],input[type="text"]{background:#0e1628;border:1px solid var(--line);color:var(--ink);padding:6px 8px;border-radius:8px}
-  label{color:var(--muted);font-size:12px}
-  #stage{flex:1;display:flex;align-items:center;justify-content:center;padding:14px}
-  canvas{display:block;background:#0b1220;border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.35)}
-  footer{padding:10px 14px;border-top:1px solid var(--line);color:var(--muted);text-align:center}
-  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0b1220;border:1px solid var(--line);color:#fff;border-radius:10px;padding:8px 12px;opacity:0;transition:.25s;pointer-events:none}
-  .toast.show{opacity:1}
-  /* dialog */
-  #help{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:18px}
-  #help[open]{display:flex}
-  #help .card{width:min(560px,92vw);background:#0e1628;border:1px solid var(--line);border-radius:16px;padding:16px}
-  #help h3{margin:.2em 0 .6em;font-size:18px}
-  #help ol{padding-left:1.2em}
-  #help .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-  /* win overlay */
-  .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center}
-  .overlay.show{display:flex}
-  .winbox{background:#0e1628;border:1px solid var(--line);padding:16px;border-radius:14px;text-align:center}
-  .kbd{padding:.1em .45em;border:1px solid var(--line);border-radius:6px;background:#0b1220}
-  /* focus ring for keyboard cell */
-  .focusRing{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(1200px 800px at 80% -10%, #4b1d85 0%, transparent 60%),
+      radial-gradient(900px 700px at 10% 110%, #7628a4 0%, transparent 60%),
+      linear-gradient(160deg, var(--bg1), var(--bg2));
+    overflow:hidden;
+  }
+  button, input{
+    font: inherit;
+  }
+  .wrap{
+    position:relative;
+    height:100%;
+    width:100%;
+  }
+
+  /* Screens */
+  .screen{
+    position:absolute; inset:0;
+    display:grid; place-items:center;
+    padding:24px;
+    transition: opacity .35s ease, transform .35s ease;
+  }
+  .screen[hidden]{opacity:0; pointer-events:none; transform: scale(.98)}
+  .card{
+    width:min(860px, 92vw);
+    background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+    border: 1px solid rgba(255,255,255,.18);
+    backdrop-filter: blur(8px);
+    border-radius: 18px;
+    padding: clamp(18px, 3vw, 28px);
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+
+  h1{
+    margin:0 0 .2em;
+    font-size: clamp(28px, 5vw, 56px);
+    line-height:1.1;
+    letter-spacing:.02em;
+    text-wrap: balance;
+  }
+  .sub{
+    opacity:.9;
+    margin: .2em 0 1.2em;
+    font-size: clamp(14px, 2.2vw, 18px);
+  }
+  .row{
+    display:flex; gap:12px; flex-wrap:wrap; align-items:center;
+    margin: 8px 0 4px;
+  }
+  .input{
+    flex:1 1 220px;
+    display:flex; gap:8px; align-items:center;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px; padding: 10px 12px;
+  }
+  .input label{opacity:.85; font-size:14px; white-space:nowrap}
+  .input input{
+    background: transparent; border:0; outline: none; color:var(--text); width:100%;
+  }
+  .btn{
+    appearance:none; border:0; cursor:pointer; user-select:none;
+    background: linear-gradient(180deg, var(--accent), #ff4dbc);
+    color:#1b0730; font-weight: 800;
+    padding: 12px 18px; border-radius: 12px;
+    box-shadow: 0 10px 20px rgba(255, 85, 200, .35), inset 0 1px 0 rgba(255,255,255,.6);
+    transition: transform .08s ease, box-shadow .2s ease, filter .1s ease;
+  }
+  .btn:hover{filter: brightness(1.05)}
+  .btn:active{transform: translateY(1px)}
+  .btn.secondary{
+    background: linear-gradient(180deg, #a5b4fc, #60a5fa);
+    color:#0a1a2b;
+    box-shadow: 0 10px 20px rgba(96,165,250,.3), inset 0 1px 0 rgba(255,255,255,.5);
+  }
+  .btn.ghost{
+    background: transparent; color: #fff; border:1px solid rgba(255,255,255,.35);
+    box-shadow: none;
+  }
+  .muted{opacity:.8}
+
+  /* Game HUD */
+  .hud{
+    position:absolute; top:8px; left:0; right:0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 8px 12px; gap:12px; pointer-events:none;
+  }
+  .pill{
+    pointer-events:auto;
+    display:flex; align-items:center; gap:10px;
+    background: var(--panel); border: 1px solid rgba(255,255,255,.18);
+    border-radius: 999px; padding: 8px 12px;
+  }
+  .score{
+    font-weight:900; font-size:clamp(18px, 4vw, 28px);
+    letter-spacing:.04em;
+  }
+  .timer{
+    --prog: 0turn;
+    width: 54px; height: 54px; border-radius: 50%;
+    background:
+      conic-gradient(var(--accent2) var(--prog), rgba(255,255,255,.15) 0),
+      radial-gradient(circle at 50% 50%, #121212 55%, transparent 56%);
+    border: 2px solid rgba(255,255,255,.25);
+    display:grid; place-items:center; font-weight:900;
+    box-shadow: 0 6px 20px rgba(0,0,0,.3), inset 0 0 18px rgba(255,255,255,.1);
+  }
+  .hud .pill span{font-weight:700}
+
+  /* Playfield */
+  .field{
+    position:absolute; inset:0; overflow:hidden;
+  }
+  .balloon{
+    position:absolute; width: clamp(44px, 8vw, 80px); aspect-ratio: .8/.95;
+    border-radius: 55% 55% 55% 55% / 70% 70% 40% 40%;
+    box-shadow: inset -10px -14px 30px rgba(0,0,0,.15);
+    transform: translate(-50%, 100%) scale(.95);
+    cursor: pointer;
+    will-change: transform;
+  }
+  .balloon::after{
+    content:""; position:absolute; left:50%; bottom:-10%;
+    width: 2px; height: clamp(45px, 10vh, 90px); background: rgba(255,255,255,.6);
+    box-shadow: 0 0 1px rgba(255,255,255,.6);
+    transform: translateX(-50%);
+  }
+  .float{
+    animation: float-up var(--dur) linear forwards, sway 3s ease-in-out infinite alternate;
+  }
+  @keyframes float-up{
+    from{ transform: translate(var(--x, -50%), 100%) scale(1) rotate(0deg);}
+    to  { transform: translate(var(--x, -50%), -130%) scale(1.05) rotate(2deg);}
+  }
+  @keyframes sway{
+    from{ margin-left:-6px } to { margin-left:6px }
+  }
+  .pop{
+    animation: pop .18s ease-out forwards;
+  }
+  @keyframes pop{
+    0%{ transform: translate(var(--x, -50%), var(--y, 0)) scale(1) }
+    80%{ transform: translate(var(--x, -50%), var(--y, 0)) scale(1.2) }
+    100%{ transform: translate(var(--x, -50%), var(--y, 0)) scale(.2); opacity:0 }
+  }
+  .spark{
+    position:absolute; width:6px; height:6px; border-radius:50%;
+    pointer-events:none;
+  }
+
+  /* Finish / Cake */
+  .center{
+    text-align:center;
+  }
+  .result{
+    font-size: clamp(22px, 4.5vw, 38px); font-weight: 900; margin:.2em 0 .6em;
+  }
+
+  .cakeArea{
+    margin-top: 14px;
+    display:grid; place-items:center;
+  }
+  .cake{
+    position:relative;
+    width:min(420px, 80vw); height: 220px;
+    background: linear-gradient(#ffe0f3, #ffc4e9);
+    border-radius: 14px 14px 40px 40px;
+    border:2px solid rgba(255,255,255,.6);
+    box-shadow: inset 0 -10px 0 #ff99d1, inset 0 -24px 0 #ff7bc4, 0 10px 40px rgba(0,0,0,.25);
+  }
+  .cake::before{
+    content:""; position:absolute; left:0; right:0; top:-22px; height:30px;
+    background:
+      radial-gradient(circle at 20px 14px, #fff 0 10px, transparent 11px) repeat-x 0 0/40px 30px,
+      linear-gradient(#fff, #ffe6f7);
+    border-radius: 14px 14px 0 0; border:2px solid rgba(255,255,255,.6);
+    border-bottom:0;
+  }
+  .candles{
+    position:absolute; left:0; right:0; top:-10px; display:flex; justify-content:center; gap:18px;
+  }
+  .candle{
+    width: 14px; height: 56px; border-radius: 6px;
+    background: repeating-linear-gradient( 90deg, #ffd4e8 0 6px, #ff91c7 6px 12px );
+    border:1px solid rgba(0,0,0,.08);
+    position:relative; cursor:pointer;
+  }
+  .candle .flame{
+    --glow: rgba(255, 215, 97, .8);
+    position:absolute; left:50%; top:-18px; transform: translateX(-50%);
+    width: 14px; height: 18px; border-radius: 10px 10px 10px 10px / 14px 14px 8px 8px;
+    background: radial-gradient(circle at 50% 30%, #fff 0 35%, #ffd166 36% 60%, #ff9900 61% 100%);
+    box-shadow: 0 0 12px 4px var(--glow), 0 0 30px 10px rgba(255, 184, 0, .4);
+    animation: flicker .8s ease-in-out infinite;
+  }
+  @keyframes flicker{
+    0%,100%{ transform: translateX(-50%) scale(1) }
+    50%{ transform: translateX(-50%) scale(1.05) }
+  }
+
+  /* Confetti canvas sits on top */
+  canvas#fx{
+    position:absolute; inset:0; pointer-events:none;
+  }
+
+  /* Accessibility: reduced motion */
+  @media (prefers-reduced-motion: reduce){
+    .float, .sway, .flicker, .pop{animation: none}
+    .balloon{transition:none}
+  }
+
+  /* Footer */
+  .foot{
+    position:absolute; bottom:8px; left:0; right:0; text-align:center;
+    opacity:.75; font-size:12px;
+  }
+  .kbd{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: rgba(255,255,255,.17); padding:2px 6px; border-radius:6px}
+
 </style>
 </head>
 <body>
-<div id="wrap">
-  <header>
-    <div class="brand">
-      <div class="ttl">KnightFlip</div>
-      <div class="sub">ナイト反転パズル — クリックしたマスと“ナイトの手”が同時反転</div>
-    </div>
-    <div class="row">
-      <div class="chip">Moves: <b id="moves">0</b></div>
-      <div class="chip">Best: <b id="best">–</b></div>
-      <div class="chip">Seed: <b id="seedShow">–</b></div>
-    </div>
-    <div class="grow"></div>
-    <div class="row" role="group" aria-label="設定">
-      <label>サイズ</label>
-      <select id="sizeSel" aria-label="盤面サイズ">
-        <option value="5">5×5</option>
-        <option value="7" selected>7×7</option>
-        <option value="9">9×9</option>
-      </select>
-      <label>難易度</label>
-      <select id="diffSel" aria-label="難易度">
-        <option value="easy">やさしい</option>
-        <option value="norm" selected>ふつう</option>
-        <option value="hard">むずかしい</option>
-        <option value="wild">ワイルド</option>
-      </select>
-      <button class="btn ghost" id="undoBtn" aria-keyshortcuts="Control+Z">元に戻す</button>
-      <button class="btn ghost" id="redoBtn" aria-keyshortcuts="Control+Shift+Z">やり直す</button>
-      <button class="btn" id="reshuffleBtn" title="同じサイズ・難易度で新局面">シャッフル</button>
-      <button class="btn strong" id="newBtn">新しく始める</button>
-      <button class="btn ghost" id="helpBtn" aria-haspopup="dialog" aria-controls="help">遊び方</button>
-    </div>
-  </header>
-
-  <div id="stage" aria-label="ゲーム盤面コンテナ">
-    <canvas id="cv" width="480" height="480" role="img" aria-label="ナイト反転パズル 盤面"></canvas>
-    <div class="overlay" id="winOverlay" aria-hidden="true">
-      <div class="winbox">
-        <h3 style="margin:.2em 0">🎉 CLEAR!</h3>
-        <div style="color:var(--muted)">シード <span id="seedWin">–</span>／手数 <b id="movesWin">0</b></div>
-        <div style="margin-top:10px;display:flex;gap:8px;justify-content:center">
-          <button class="btn strong" id="nextBtn">もう1問</button>
-          <button class="btn ghost" id="shareBtn">シードをコピー</button>
+<div class="wrap">
+  <!-- Start Screen -->
+  <section id="start" class="screen">
+    <div class="card">
+      <h1>🎉 Happy Birthday! / おたんじょうび おめでとう！</h1>
+      <p class="sub">30秒で <b>🎈バルーンをできるだけ割って</b> スコアを稼ごう。ゲームのあとに <b>🎂ケーキのろうそく</b> を消してお祝い！</p>
+      <div class="row">
+        <div class="input">
+          <label for="name">おなまえ</label>
+          <input id="name" type="text" placeholder="例）さくら / Taro" autocomplete="nickname">
+        </div>
+        <div class="input" style="max-width:200px">
+          <label for="age">ねんれい</label>
+          <input id="age" type="number" min="1" max="120" inputmode="numeric" placeholder="例）7">
         </div>
       </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="playBtn">ゲームスタート</button>
+        <button class="btn ghost" id="howBtn">あそびかた</button>
+      </div>
+      <details style="margin-top:10px">
+        <summary class="muted">設定（カラー・効果）</summary>
+        <div class="row" style="margin-top:8px">
+          <div class="input" style="max-width:220px">
+            <label for="color">テーマ</label>
+            <input id="color" type="color" value="#ff7bd8" />
+          </div>
+          <div class="input" style="max-width:260px">
+            <label for="duration">制限時間</label>
+            <input id="duration" type="range" min="15" max="60" value="30" oninput="durationOut.textContent=this.value+' 秒'">
+            <span id="durationOut" aria-hidden="true">30 秒</span>
+          </div>
+        </div>
+      </details>
     </div>
-  </div>
+  </section>
 
-  <footer>
-    クリック/タップ：マス反転（ナイトの手も反転） ／ 矢印キーで移動、<span class="kbd">Space</span>か<span class="kbd">Enter</span>で反転。<br />
-    生成は常に“解ける局面”。難易度はランダム手数で調整。アクセシビリティ配慮：拡大可・ARIAライブ・キーボード操作。
-  </footer>
-</div>
-
-<!-- How-to dialog -->
-<div id="help" role="dialog" aria-modal="true" aria-label="遊び方">
-  <div class="card" role="document">
-    <h3>🧩 遊び方 — KnightFlip</h3>
-    <ol>
-      <li>マスをクリック/タップすると、<b>そのマス</b>と、そこから<b>ナイトの手</b>にあるマス（2×1 or 1×2 離れ）も同時に反転します。</li>
-      <li>すべてのマスを<b>オフ（黒/白抜き）</b>にできればクリア。</li>
-      <li>盤面は常に<b>解ける局面のみ</b>生成（解答は一意とは限りません）。</li>
-      <li>矢印キーでカーソル移動、<span class="kbd">Space</span>/<span class="kbd">Enter</span> で反転、<span class="kbd">Ctrl+Z</span> で元に戻す。</li>
-      <li>シードをコピーして友だちに同じ問題を共有できます。</li>
-    </ol>
-    <div class="actions">
-      <button class="btn ghost" id="closeHelp">閉じる</button>
-      <button class="btn strong" id="okHelp">OK</button>
+  <!-- How to -->
+  <section id="how" class="screen" hidden>
+    <div class="card">
+      <h1>あそびかた</h1>
+      <ul style="line-height:1.9; margin:0 0 10px 1.2em">
+        <li>30秒間、画面にあがってくる <b>バルーンをタップ / クリック</b> して割ろう。</li>
+        <li>普通のバルーン = <b>+1点</b>、キラ⭐バルーン = <b>+3点</b>！</li>
+        <li><span class="kbd">R</span> でもリスタートできるよ。</li>
+      </ul>
+      <div class="row">
+        <button class="btn secondary" id="backBtn">OK, はじめる</button>
+      </div>
     </div>
-  </div>
-</div>
+  </section>
 
-<div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <!-- Game Screen -->
+  <section id="game" class="screen" hidden>
+    <div class="hud">
+      <div class="pill"><span>⏱️</span><div class="timer" id="timer"><span id="timeLeft">30</span></div></div>
+      <div class="pill"><span>🧑‍🎂</span><span id="playerName">Guest</span></div>
+      <div class="pill"><span>⭐</span><div class="score"><span id="score">0</span> pt</div></div>
+    </div>
+    <div class="field" id="field" aria-label="ゲームフィールド"></div>
+    <canvas id="fx"></canvas>
+  </section>
+
+  <!-- Result Screen -->
+  <section id="result" class="screen" hidden>
+    <div class="card center">
+      <div style="font-size:42px">🎉</div>
+      <div class="result"><span id="hello"></span> スコアは <span id="finalScore">0</span> 点！</div>
+      <div class="muted" id="rankText">がんばったね！</div>
+
+      <div class="cakeArea" id="cakeArea">
+        <div style="margin:.6em 0 .3em">ろうそくを全部クリック / タップして消してね</div>
+        <div class="cake" role="img" aria-label="お誕生日ケーキ">
+          <div class="candles" id="candles"></div>
+        </div>
+      </div>
+
+      <div class="row" style="justify-content:center; margin-top:16px">
+        <button class="btn secondary" id="shareBtn">結果をシェア</button>
+        <button class="btn" id="againBtn">もう一回</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">© Birthday Game · <span class="muted">スペースキー <span class="kbd">R</span> で再スタート</span></div>
+</div>
 
 <script>
-/* ============================================================
-   KnightFlip — ナイト反転パズル
-   クリックしたセル＋ナイトの手（±1,±2/±2,±1）が同時トグル。
-   生成は solved からランダム手を適用 → 常に解ける局面。
-   著作権配慮：既存有名作の名称/データ/コードは一切流用なし。
-   ============================================================ */
+(() => {
+  const $ = (q, el=document) => el.querySelector(q);
+  const $all = (q, el=document) => [...el.querySelectorAll(q)];
 
-(()=> {
-  // ---------- DOM ----------
-  const cv = document.getElementById('cv');
-  const ctx = cv.getContext('2d');
-  const movesEl = document.getElementById('moves');
-  const bestEl  = document.getElementById('best');
-  const seedShow= document.getElementById('seedShow');
-  const sizeSel = document.getElementById('sizeSel');
-  const diffSel = document.getElementById('diffSel');
-  const undoBtn = document.getElementById('undoBtn');
-  const redoBtn = document.getElementById('redoBtn');
-  const reshuf  = document.getElementById('reshuffleBtn');
-  const newBtn  = document.getElementById('newBtn');
-  const helpBtn = document.getElementById('helpBtn');
-  const help    = document.getElementById('help');
-  const closeHelp = document.getElementById('closeHelp');
-  const okHelp  = document.getElementById('okHelp');
-  const toastEl = document.getElementById('toast');
-  const overlay = document.getElementById('winOverlay');
-  const seedWin = document.getElementById('seedWin');
-  const movesWin= document.getElementById('movesWin');
-  const nextBtn = document.getElementById('nextBtn');
-  const shareBtn= document.getElementById('shareBtn');
+  // Elements
+  const screens = {
+    start: $("#start"),
+    how: $("#how"),
+    game: $("#game"),
+    result: $("#result")
+  };
+  const field = $("#field");
+  const scoreEl = $("#score");
+  const timeEl = $("#timeLeft");
+  const timerRing = $("#timer");
+  const fxCanvas = $("#fx");
+  const ctx = fxCanvas.getContext("2d");
+  const playerNameEl = $("#playerName");
+  const nameInput = $("#name");
+  const ageInput = $("#age");
+  const colorInput = $("#color");
+  const durationInput = $("#duration");
+  const finalScoreEl = $("#finalScore");
+  const helloEl = $("#hello");
+  const shareBtn = $("#shareBtn");
+  const againBtn = $("#againBtn");
+  const playBtn = $("#playBtn");
+  const howBtn = $("#howBtn");
+  const backBtn = $("#backBtn");
+  const candlesWrap = $("#candles");
+  const cakeArea = $("#cakeArea");
+  const rankText = $("#rankText");
 
-  // ---------- Layout / HiDPI ----------
-  const BASE = 480;
-  function fit(){
-    const maxW = Math.min(innerWidth - 28, 560);
-    const ratio = maxW / BASE;
-    const dpr = Math.max(1, devicePixelRatio || 1);
-
-    cv.style.width  = maxW + 'px';
-    cv.style.height = (BASE * ratio) + 'px';
-    cv.width  = Math.round(BASE * dpr);
-    cv.height = Math.round(BASE * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    draw();
-  }
-  addEventListener('resize', fit);
-
-  // ---------- Game State ----------
-  let N = 7;                 // board size
-  let grid = [];             // boolean 2D
-  let moves = 0;
-  let seed = 0;
-  let prng = null;
-  const UNDO_MAX = 200;
-  const undoStack = [];
-  const redoStack = [];
-  let focusCell = {i:0,j:0}; // keyboard focus (grid coords)
-  let won = false;
-
-  // 難易度 → スクランブル手数範囲
-  const DIFF = {
-    easy: [6, 10],
-    norm: [12, 20],
-    hard: [24, 36],
-    wild: [40, 60]
+  // State
+  let state = {
+    name: "Guest",
+    age: null,
+    score: 0,
+    timeLeft: 30,
+    running: false,
+    loopId: null,
+    spawnTimer: 0,
+    spawnEvery: 700, // ms
+    lastTick: 0,
+    balloons: new Set(),
+    specialRate: 0.18, // 18% special ⭐
   };
 
-  // Knight offsets
-  const KN = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
+  // Utils
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const pick = arr => arr[(Math.random() * arr.length) | 0];
 
-  // ---------- PRNG（Mulberry32） ----------
-  function mulberry32(a){
-    return function(){
-      a |= 0; a = a + 0x6D2B79F5 | 0;
-      let t = Math.imul(a ^ a >>> 15, 1 | a);
-      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  // Resize canvas
+  const fitCanvas = () => {
+    fxCanvas.width = field.clientWidth;
+    fxCanvas.height = field.clientHeight;
+  };
+  addEventListener("resize", fitCanvas, {passive:true});
+  const setTheme = (hex) => {
+    document.documentElement.style.setProperty("--accent", hex);
+  };
+
+  // Screens
+  const show = id => {
+    for (const key in screens) {
+      screens[key].hidden = key !== id;
+    }
+  };
+
+  // Confetti particles
+  const confetti = [];
+  function burst(x, y, count=24){
+    for(let i=0;i<count;i++){
+      confetti.push({
+        x, y,
+        vx: Math.cos((i/count)*Math.PI*2) * rand(2,5),
+        vy: Math.sin((i/count)*Math.PI*2) * rand(2,5) - rand(2,6),
+        g: .12,
+        life: rand(40,70),
+        r: rand(2,4),
+        color: pick(["#ffd166","#ff7bd8","#7dd3fc","#a7f3d0","#fdba74","#fca5a5"])
+      });
+    }
+  }
+
+  function drawFX(){
+    ctx.clearRect(0,0,fxCanvas.width, fxCanvas.height);
+    for(let i=confetti.length-1;i>=0;i--){
+      const p = confetti[i];
+      p.vy += p.g;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= 1;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fill();
+      if(p.life<=0 || p.y>fxCanvas.height+20) confetti.splice(i,1);
+    }
+    requestAnimationFrame(drawFX);
+  }
+
+  // Balloon creation
+  const balloonColors = [
+    ["#ff9fdc","#ff7bd8"],
+    ["#ffe48c","#ffd166"],
+    ["#9bf0ff","#7dd3fc"],
+    ["#b2f5ea","#2dd4bf"],
+    ["#c4b5fd","#a78bfa"],
+    ["#fecaca","#fca5a5"],
+    ["#fde68a","#fbbf24"]
+  ];
+  function makeBalloon(){
+    const b = document.createElement("div");
+    b.className = "balloon float";
+    const isSpecial = Math.random() < state.specialRate;
+    const [c1,c2] = isSpecial ? ["#fff6a6","#ffd166"] : pick(balloonColors);
+    const left = rand(10, 90);
+    const dur = rand(7, 13); // seconds
+    b.style.left = left + "%";
+    b.style.setProperty("--x", "-50%");
+    b.style.setProperty("--dur", dur+"s");
+    b.style.background = `radial-gradient(120% 120% at 30% 30%, rgba(255,255,255,.85), ${c1} 35%, ${c2})`;
+    if(isSpecial){
+      // star overlay
+      b.style.boxShadow = "0 0 0 2px rgba(255,255,255,.4) inset, 0 0 30px rgba(255, 209, 102, .35)";
+      b.dataset.special = "1";
+      const star = document.createElement("div");
+      star.textContent = "⭐";
+      star.style.position="absolute";
+      star.style.inset="0";
+      star.style.display="grid";
+      star.style.placeItems="center";
+      star.style.fontSize="clamp(22px, 4vw, 36px)";
+      star.style.opacity=".9";
+      b.appendChild(star);
+    }
+
+    // Remove when out of view
+    const cleanup = () => {
+      b.removeEventListener("animationend", cleanup);
+      state.balloons.delete(b);
+      b.remove();
     };
+    b.addEventListener("animationend", cleanup, {once:true});
+
+    // Pop handler
+    const pop = (ev) => {
+      if(!state.running) return;
+      ev.stopPropagation();
+      const rect = b.getBoundingClientRect();
+      burst(rect.left + rect.width/2, rect.top + rect.height/2, isSpecial ? 30 : 16);
+      b.classList.remove("float");
+      b.classList.add("pop");
+      b.style.setProperty("--y", "0");
+      b.removeEventListener("pointerdown", pop);
+      b.addEventListener("animationend", () => {
+        state.balloons.delete(b);
+        b.remove();
+      }, {once:true});
+      addScore(isSpecial ? 3 : 1);
+    };
+    b.addEventListener("pointerdown", pop);
+
+    state.balloons.add(b);
+    field.appendChild(b);
   }
-  function randInt(lo, hi){ return Math.floor(prng() * (hi - lo + 1)) + lo; }
-  function choice(arr){ return arr[Math.floor(prng()*arr.length)] }
 
-  // ---------- Persistence ----------
-  function bestKey(){ return `kf_best_${N}_${diffSel.value}`; }
-  function seedKey(){ return `kf_seed_${N}_${diffSel.value}`; }
-  function getBest(){ return +(localStorage.getItem(bestKey())||0) || null; }
-  function setBest(v){ localStorage.setItem(bestKey(), v) }
-
-  // ---------- Grid helpers ----------
-  function makeGrid(n, fill=false){
-    return Array.from({length:n},()=>Array.from({length:n},()=>fill));
+  // Score & timer
+  function addScore(n){
+    state.score += n;
+    scoreEl.textContent = state.score;
+    scoreEl.animate([{transform:"scale(1)"},{transform:"scale(1.18)"},{transform:"scale(1)"}], {duration:180, easing:"ease-out"});
   }
-  function cloneGrid(g){ return g.map(row=>row.slice()) }
-  function inBounds(i,j){ return i>=0 && j>=0 && i<N && j<N }
+  function updateTimerUI(){
+    timeEl.textContent = Math.ceil(state.timeLeft);
+    const p = Math.max(0, state.timeLeft) / state.totalTime;
+    timerRing.style.setProperty("--prog", (1-p)+"turn");
+  }
 
-  function toggle(i,j){
-    grid[i][j] = !grid[i][j];
-    for (const [di,dj] of KN){
-      const ni=i+di, nj=j+dj;
-      if (inBounds(ni,nj)) grid[ni][nj] = !grid[ni][nj];
+  // Game loop
+  function startGame(){
+    fitCanvas();
+    state.name = (nameInput.value || "Guest").trim().slice(0,20);
+    playerNameEl.textContent = state.name;
+    state.age = clamp(parseInt(ageInput.value||"7",10)||7, 1, 120);
+    state.totalTime = clamp(parseInt(durationInput.value,10)||30, 10, 180);
+    state.timeLeft = state.totalTime;
+    state.score = 0;
+    state.spawnEvery = 700;
+    state.lastTick = performance.now();
+    scoreEl.textContent = "0";
+    timeEl.textContent = state.totalTime;
+    timerRing.style.setProperty("--prog", "0turn");
+    state.running = true;
+
+    // clear old balloons
+    state.balloons.forEach(b => b.remove());
+    state.balloons.clear();
+
+    // start loop
+    cancelAnimationFrame(state.loopId);
+    drawFX(); // ensures FX loop running
+    loop();
+  }
+
+  function loop(now=performance.now()){
+    if(!state.running) return;
+    const dt = now - state.lastTick;
+    state.lastTick = now;
+
+    // time
+    state.timeLeft -= dt/1000;
+    updateTimerUI();
+
+    // spawn balloons
+    state.spawnTimer += dt;
+    const dynamicRate = clamp(700 - ( (state.totalTime - state.timeLeft) / state.totalTime )*300, 380, 700);
+    const rate = dynamicRate;
+    if(state.spawnTimer >= rate){
+      state.spawnTimer = 0;
+      // spawn 1~2 balloons occasionally
+      const count = Math.random() < 0.25 ? 2 : 1;
+      for(let i=0;i<count;i++) makeBalloon();
     }
-  }
 
-  // ---------- Undo/Redo ----------
-  function snapshot(){ return {grid:cloneGrid(grid), moves} }
-  function pushUndo(){
-    undoStack.push(snapshot());
-    if (undoStack.length>UNDO_MAX) undoStack.shift();
-    redoStack.length = 0;
-  }
-  function undo(){
-    if (!undoStack.length) return;
-    const s = undoStack.pop();
-    redoStack.push(snapshot());
-    grid = s.grid; moves = s.moves;
-    updateHUD(); draw();
-  }
-  function redo(){
-    if (!redoStack.length) return;
-    const s = redoStack.pop();
-    undoStack.push(snapshot());
-    grid = s.grid; moves = s.moves;
-    updateHUD(); draw();
-  }
-
-  // ---------- Generation ----------
-  function newSeed(val){
-    if (typeof val === 'number') seed = val >>> 0;
-    else seed = (Date.now() ^ Math.floor(Math.random()*1e9)) >>> 0;
-    prng = mulberry32(seed);
-    localStorage.setItem(seedKey(), String(seed));
-  }
-  function applyScramble(){
-    const [lo,hi] = DIFF[diffSel.value] || DIFF.norm;
-    const K = randInt(lo, hi);
-    for (let k=0;k<K;k++){
-      const i = randInt(0,N-1), j = randInt(0,N-1);
-      toggle(i,j);
+    // end
+    if(state.timeLeft <= 0){
+      endGame();
+      return;
     }
-    // 冗長すぎる全点対称性を回避するため、ごく稀にランダムセルを固定オフ
-    if (prng() < 0.08){ grid[randInt(0,N-1)][randInt(0,N-1)] = false; }
+    state.loopId = requestAnimationFrame(loop);
   }
 
-  function startNew(){
-    won = false;
-    overlay.classList.remove('show');
-    grid = makeGrid(N, false);
-    moves = 0;
-    undoStack.length = 0; redoStack.length = 0;
-    newSeed();
-    prng(); // warm-up
-    applyScramble();
-    updateHUD(); draw();
-    announce(`新しい局面を開始。サイズ${N}、難易度${diffSel.options[diffSel.selectedIndex].text}、シード${seed}`);
+  function endGame(){
+    state.running = false;
+    cancelAnimationFrame(state.loopId);
+    // remove remaining balloons gracefully
+    state.balloons.forEach(b => b.remove());
+    state.balloons.clear();
+
+    // Result
+    finalScoreEl.textContent = state.score;
+    helloEl.textContent = state.name;
+    rankText.textContent = getPraise(state.score);
+
+    // Build cake & candles
+    buildCandles();
+    // Screen switch
+    show("result");
+    // celebratory burst
+    setTimeout(()=>{
+      burst(fxCanvas.width*.25, fxCanvas.height*.2, 50);
+      burst(fxCanvas.width*.75, fxCanvas.height*.28, 50);
+      burst(fxCanvas.width*.50, fxCanvas.height*.3, 60);
+    }, 50);
   }
 
-  function reshuffle(){
-    won = false;
-    overlay.classList.remove('show');
-    grid = makeGrid(N, false);
-    moves = 0;
-    undoStack.length = 0; redoStack.length = 0;
-    // 同じ seed を使わず、直近 seed の派生（加算）で変化を出す
-    newSeed((seed + 0x9e3779b9) >>> 0);
-    prng(); applyScramble();
-    updateHUD(); draw();
+  function getPraise(score){
+    if(score >= 60) return "最強！あなたはバルーン・マスター！";
+    if(score >= 40) return "すごい！とっても上手！";
+    if(score >= 25) return "ナイス！その調子！";
+    if(score >= 10) return "グッド！まだまだいける！";
+    return "がんばったね！もう一回やってみよう！";
   }
 
-  function loadFromHash(){
-    const h = location.hash.slice(1);
-    if (!h) return false;
-    const m = h.match(/^n(\d+)-d(easy|norm|hard|wild)-s(\d+)$/);
-    if (!m) return false;
-    N = Math.max(3, Math.min(15, +m[1]|0));
-    sizeSel.value = String(N);
-    diffSel.value = m[2];
-    won = false; overlay.classList.remove('show');
-    grid = makeGrid(N,false); moves=0; undoStack.length=0; redoStack.length=0;
-    newSeed((+m[3])>>>0);
-    prng(); applyScramble();
-    updateHUD(); draw();
-    return true;
-  }
-
-  function shareSeed(){
-    const tag = `n${N}-d${diffSel.value}-s${seed>>>0}`;
-    const url = location.href.replace(/#.*$/,'') + '#' + tag;
-    navigator.clipboard?.writeText(url).then(()=>{
-      toast('URLをクリップボードにコピーしました');
-    }, ()=> toast('コピーできませんでした'));
-  }
-
-  // ---------- HUD / Win ----------
-  function updateHUD(){
-    movesEl.textContent = String(moves);
-    seedShow.textContent = String(seed>>>0);
-    const best = getBest();
-    bestEl.textContent = best!=null ? String(best) : '–';
-    undoBtn.disabled = undoStack.length===0;
-    redoBtn.disabled = redoStack.length===0;
-  }
-
-  function isClear(){
-    for (let i=0;i<N;i++) for (let j=0;j<N;j++) if (grid[i][j]) return false;
-    return true;
-  }
-
-  function onMove(i,j){
-    if (won) return;
-    pushUndo();
-    toggle(i,j);
-    moves++;
-    updateHUD();
-    draw();
-
-    if (isClear()){
-      won = true;
-      const best = getBest();
-      if (best==null || moves < best) setBest(moves);
-      seedWin.textContent = String(seed>>>0);
-      movesWin.textContent = String(moves);
-      overlay.classList.add('show');
-      announce('クリア！ おめでとうございます');
-    }
-  }
-
-  // ---------- Rendering ----------
-  function draw(){
-    const W = cv.width, H = cv.height; // device pixels
-    ctx.save();
-    // 論理座標を 0..BASE に
-    ctx.setTransform(W/BASE, 0, 0, H/BASE, 0, 0);
-    ctx.clearRect(0,0,BASE,BASE);
-
-    const pad = 24;
-    const gW = BASE - pad*2;
-    const cell = gW / N;
-    const r = Math.min(12, cell*0.18); // corner radius
-
-    // board bg
-    ctx.fillStyle = '#0e1628';
-    roundRect(pad-6, pad-6, gW+12, gW+12, 14);
-    ctx.fill();
-    ctx.strokeStyle = getCSS('--line'); ctx.lineWidth = 2;
-    roundRect(pad-6, pad-6, gW+12, gW+12, 14);
-    ctx.stroke();
-
-    // cells
-    for (let i=0;i<N;i++){
-      for (let j=0;j<N;j++){
-        const x = pad + j*cell, y = pad + i*cell;
-        const on = grid[i][j];
-        // tile
-        const base = on ? getCSS('--on') : '#0b1220';
-        const grd = ctx.createLinearGradient(x,y,x+cell,y+cell);
-        grd.addColorStop(0, on ? '#e0f2fe' : '#0b1220');
-        grd.addColorStop(1, base);
-        ctx.fillStyle = grd;
-        roundRect(x+2, y+2, cell-4, cell-4, r); ctx.fill();
-
-        // grid line
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
-        roundRect(x+2, y+2, cell-4, cell-4, r); ctx.stroke();
-
-        // focus ring (keyboard)
-        if (focusCell.i===i && focusCell.j===j){
-          ctx.strokeStyle = getCSS('--focus'); ctx.lineWidth = 2;
-          roundRect(x+4, y+4, cell-8, cell-8, Math.max(6,r-2)); ctx.stroke();
+  // Cake & candles
+  function buildCandles(){
+    candlesWrap.innerHTML = "";
+    const count = clamp(state.age || 7, 1, 10); // ろうそくは最大10本
+    for(let i=0;i<count;i++){
+      const c = document.createElement("div");
+      c.className="candle";
+      const flame = document.createElement("div");
+      flame.className="flame";
+      c.appendChild(flame);
+      c.title = "ふーっ（クリック／タップで消えるよ）";
+      c.addEventListener("pointerdown", () => {
+        if(flame){
+          flame.remove();
+          burst(c.getBoundingClientRect().left + 7, c.getBoundingClientRect().top - 6, 18);
+          checkAllExtinguished();
         }
+      }, {passive:false});
+      candlesWrap.appendChild(c);
+    }
+  }
+  function checkAllExtinguished(){
+    const left = $all(".candle .flame", candlesWrap).length;
+    if(left===0){
+      // fireworks burst rain
+      for(let i=0;i<8;i++){
+        setTimeout(()=>{
+          burst(rand(40, fxCanvas.width-40), rand(40, fxCanvas.height*0.4), 70);
+        }, 120*i);
       }
+      const msg = document.createElement("div");
+      msg.textContent = "おめでとう！ 🎂";
+      msg.style.fontSize = "clamp(26px, 6vw, 52px)";
+      msg.style.fontWeight = "900";
+      msg.style.marginTop = "12px";
+      msg.style.textShadow = "0 6px 30px rgba(0,0,0,.35)";
+      cakeArea.appendChild(msg);
     }
-
-    // legend: show knight pattern from focus
-    drawLegend(pad, pad, cell);
-
-    ctx.restore();
   }
 
-  function drawLegend(pad, padY, cell){
-    const i0=focusCell.i, j0=focusCell.j;
-    const x0 = pad + j0*cell + cell/2;
-    const y0 = padY + i0*cell + cell/2;
-    ctx.save();
-    ctx.globalAlpha = 0.28;
-    ctx.strokeStyle = getCSS('--accent');
-    ctx.lineWidth = 3;
-    for (const [di,dj] of KN){
-      const ni=i0+di, nj=j0+dj;
-      if (!inBounds(ni,nj)) continue;
-      const x1 = pad + nj*cell + cell/2;
-      const y1 = padY + ni*cell + cell/2;
-      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
-      // dot
-      ctx.beginPath(); ctx.arc(x1,y1, 5, 0, Math.PI*2); ctx.fillStyle=getCSS('--accent'); ctx.fill();
-    }
-    // center dot
-    ctx.beginPath(); ctx.arc(x0,y0, 5, 0, Math.PI*2); ctx.fillStyle=getCSS('--accent'); ctx.fill();
-    ctx.restore();
-  }
-
-  function roundRect(x,y,w,h,r){
-    ctx.beginPath();
-    ctx.moveTo(x+r,y);
-    ctx.arcTo(x+w,y,x+w,y+h,r);
-    ctx.arcTo(x+w,y+h,x,y+h,r);
-    ctx.arcTo(x,y+h,x,y,r);
-    ctx.arcTo(x,y,x+w,y,r);
-    ctx.closePath();
-  }
-  function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim() }
-
-  // ---------- Pointer ----------
-  function evtPos(e){
-    const rect = cv.getBoundingClientRect();
-    const clientX = e.clientX ?? (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY ?? (e.touches && e.touches[0].clientY);
-    const x = (clientX - rect.left) * (BASE/rect.width);
-    const y = (clientY - rect.top)  * (BASE/rect.height);
-    return {x,y};
-  }
-  function pickCell(x,y){
-    const pad=24, gW=BASE-pad*2, cell=gW/N;
-    const j = Math.floor((x-pad)/cell), i = Math.floor((y-pad)/cell);
-    if (!inBounds(i,j)) return null;
-    return {i,j};
-  }
-
-  cv.addEventListener('pointerdown', (e)=>{
-    const p = evtPos(e);
-    const c = pickCell(p.x,p.y);
-    if (!c) return;
-    focusCell = c;
-    onMove(c.i, c.j);
-  });
-
-  // ---------- Keyboard ----------
-  addEventListener('keydown', (e)=>{
-    if (helpOpen) return;
-    const k = e.key;
-    if (k==='ArrowUp'){ focusCell.i = Math.max(0, focusCell.i-1); draw(); e.preventDefault(); }
-    else if (k==='ArrowDown'){ focusCell.i = Math.min(N-1, focusCell.i+1); draw(); e.preventDefault(); }
-    else if (k==='ArrowLeft'){ focusCell.j = Math.max(0, focusCell.j-1); draw(); e.preventDefault(); }
-    else if (k==='ArrowRight'){ focusCell.j = Math.min(N-1, focusCell.j+1); draw(); e.preventDefault(); }
-    else if (k===' ' || k==='Enter'){ onMove(focusCell.i, focusCell.j); e.preventDefault(); }
-    else if ((e.ctrlKey||e.metaKey) && !e.shiftKey && (k==='z' || k==='Z')){ undo(); }
-    else if ((e.ctrlKey||e.metaKey) && (e.shiftKey && (k==='z' || k==='Z'))){ redo(); }
-  });
-
-  // ---------- Buttons ----------
-  sizeSel.addEventListener('change', ()=>{
-    N = +sizeSel.value|0;
-    startNew(); draw();
-  });
-  diffSel.addEventListener('change', ()=>{ startNew(); });
-  newBtn.addEventListener('click', startNew);
-  reshuf.addEventListener('click', reshuffle);
-  undoBtn.addEventListener('click', undo);
-  redoBtn.addEventListener('click', redo);
-  nextBtn.addEventListener('click', ()=>{ overlay.classList.remove('show'); reshuffle(); });
-  shareBtn.addEventListener('click', shareSeed);
-
-  // ---------- Help dialog ----------
-  let helpOpen = false;
-  function openHelp(){ helpOpen=true; help.setAttribute('open',''); }
-  function closeHelpDlg(){ helpOpen=false; help.removeAttribute('open'); }
-  helpBtn.addEventListener('click', openHelp);
-  closeHelp.addEventListener('click', closeHelpDlg);
-  okHelp.addEventListener('click', closeHelpDlg);
-  help.addEventListener('click', (e)=>{ if (e.target===help) closeHelpDlg(); });
-
-  // ---------- Toast ----------
-  let toastTimer=null;
-  function toast(msg){
-    toastEl.textContent = msg;
-    toastEl.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(()=>toastEl.classList.remove('show'), 1400);
-  }
-
-  // ---------- ARIA announce ----------
-  function announce(msg){
-    toast(msg); // トーストは role="status"
-  }
-
-  // ---------- Init ----------
-  function init(){
-    // 既存ハッシュから再現 or 保存 seed を使う
-    if (!loadFromHash()){
-      N = +sizeSel.value|0;
-      const savedSeed = +(localStorage.getItem(seedKey())||0);
-      if (savedSeed){
-        newSeed(savedSeed>>>0);
-        grid = makeGrid(N,false); moves=0; undoStack.length=0; redoStack.length=0;
-        prng = mulberry32(seed); prng(); applyScramble();
+  // Share
+  async function shareScore(){
+    const shareText = `🎉 ${state.name}のバースデースコア: ${state.score}点！ #BirthdayBalloons`;
+    const shareData = {
+      title: "Birthday Balloons",
+      text: shareText,
+      url: location.href
+    };
+    try{
+      if(navigator.share){
+        await navigator.share(shareData);
       }else{
-        startNew();
+        await navigator.clipboard.writeText(shareText + " " + location.href);
+        shareBtn.textContent = "リンクをコピーしました！";
+        setTimeout(()=> shareBtn.textContent = "結果をシェア", 1400);
       }
+    }catch(e){
+      console.log(e);
     }
-    fit();
   }
-  addEventListener('hashchange', ()=>{ loadFromHash(); draw(); });
-  init();
+
+  // Interactions
+  playBtn.addEventListener("click", () => {
+    setTheme(colorInput.value || "#ff7bd8");
+    show("game");
+    startGame();
+  });
+  howBtn.addEventListener("click", () => show("how"));
+  backBtn.addEventListener("click", () => show("start"));
+  againBtn.addEventListener("click", () => {
+    show("game");
+    startGame();
+  });
+  shareBtn.addEventListener("click", shareScore);
+
+  // Keyboard shortcuts
+  addEventListener("keydown", (e) => {
+    if(e.key.toLowerCase()==="r"){
+      show("game"); startGame();
+    }
+  });
+
+  // Init
+  show("start");
+  fitCanvas();
+
+  // Click anywhere in field to create a tiny spark (fun)
+  field.addEventListener("pointerdown", (e) => {
+    if(!state.running) return;
+    const rect = field.getBoundingClientRect();
+    burst(e.clientX - rect.left, e.clientY - rect.top, 10);
+  });
+
+  // Respect chosen color
+  colorInput.addEventListener("input", (e)=> setTheme(e.target.value));
+
 })();
 </script>
 </body>
